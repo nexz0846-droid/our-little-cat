@@ -238,6 +238,11 @@ if (action === 'pet') {
             <h2>💌 ห้องแมวของเรา</h2>
             <p>สร้างห้องใหม่ หรือใส่รหัสที่คนรักส่งมาให้</p>
 
+<div className="couple-photo">
+  <img src="/images/couple.png" alt="รูปคู่ของเรา" />
+  <p>Our Little Memories 💗</p>
+</div>
+
             <div className="actions">
               <button onClick={handleCreateRoom} disabled={loading}>
                 {loading ? 'กำลังทำรายการ...' : '🏡 สร้างห้องใหม่'}

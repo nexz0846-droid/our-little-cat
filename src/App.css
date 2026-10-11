@@ -317,3 +317,27 @@ footer {
     animation-duration: 0.01ms;
   }
 }
+.couple-photo {
+  margin: 20px auto;
+  max-width: 280px;
+  padding: 10px;
+  background: #fff8fc;
+  border: 2px solid #f5c5df;
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(220, 120, 170, 0.15);
+  text-align: center;
+}
+
+.couple-photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.couple-photo p {
+  margin: 10px 0 2px;
+  color: #d66a9e;
+  font-weight: 600;
+}
