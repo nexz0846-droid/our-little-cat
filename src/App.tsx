@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import './App.css'
+
 import {
   createCatRoom,
   joinCatRoom,
@@ -8,7 +9,11 @@ import {
   performCatAction,
   subscribeToCat,
   leaveRealtime,
+  getDailyMissions,
+  recordDailyCatAction,
+  subscribeToMissions,
 } from './catRoom'
+
 
 type CatState = {
   room_id: string
@@ -18,7 +23,22 @@ type CatState = {
   hearts: number
   updated_at: string
 }
+type MissionType = 'feed' | 'play' | 'pet'
 
+type Mission = {
+  mission_type: MissionType
+  progress: number
+  claimed: boolean
+}
+
+const missionInfo: Record<
+  MissionType,
+  { title: string; emoji: string; target: number }
+> = {
+  feed: { title: 'ให้อาหารน้องแมว', emoji: '🍓', target: 1 },
+  play: { title: 'เล่นกับน้องแมว', emoji: '🧶', target: 2 },
+  pet: { title: 'ลูบหัวน้องแมว', emoji: '🐾', target: 3 },
+}
 function App() {
   const [roomId, setRoomId] = useState(
     () => localStorage.getItem('catRoomId') || '',
@@ -31,6 +51,9 @@ function App() {
   const [message, setMessage] = useState('วันนี้มาเล่นกับน้องแมวกันนะ 💗')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+const [missions, setMissions] = useState<Mission[]>([])
+const [bonusClaimed, setBonusClaimed] = useState(false)
 
   useEffect(() => {
     if (!roomId) return
@@ -59,6 +82,44 @@ function App() {
       void leaveRealtime(channel)
     }
   }, [roomId])
+
+
+useEffect(() => {
+  if (!roomId) {
+    setMissions([])
+    setBonusClaimed(false)
+    return
+  }
+
+  let active = true
+
+  const refreshMissions = async () => {
+    try {
+      const daily = await getDailyMissions(roomId)
+      if (!active) return
+
+      setMissions(daily.missions)
+      setBonusClaimed(daily.bonusClaimed)
+    } catch (err) {
+      if (active) {
+        setError(
+          err instanceof Error ? err.message : 'โหลดภารกิจไม่สำเร็จ',
+        )
+      }
+    }
+  }
+
+  void refreshMissions()
+
+  const channel = subscribeToMissions(roomId, () => {
+    void refreshMissions()
+  })
+
+  return () => {
+    active = false
+    void leaveRealtime(channel)
+  }
+}, [roomId])
 
   const saveRoom = (id: string, code: string) => {
     localStorage.setItem('catRoomId', id)
@@ -104,28 +165,47 @@ function App() {
     }
   }
 
-  const handleAction = async (action: 'feed' | 'play' | 'pet') => {
-    if (!roomId || !cat || loading) return
+  
+const handleAction = async (action: 'feed' | 'play' | 'pet') => {
+  if (!roomId || !cat || loading) return
 
-    setLoading(true)
-    setError('')
+  setLoading(true)
+  setError('')
 
-    const messages = {
-      feed: 'งั่ม ๆ อร่อยจัง ขอบคุณนะ! 😻',
-      play: 'เหมียววว~ น้องแมวมีความสุขมากเลย 💕',
-      pet: 'น้องแมวเคลิ้มแล้ว งื้ออ 🥹💗',
-    }
-
-    try {
-      const updated = await performCatAction(roomId, action)
-      setCat(updated as CatState)
-      setMessage(messages[action])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'ทำรายการไม่สำเร็จ')
-    } finally {
-      setLoading(false)
-    }
+  const messages = {
+    feed: 'งั่ม ๆ อร่อยจัง ขอบคุณนะ! 😻',
+    play: 'เหมียววว~ น้องแมวมีความสุขมากเลย 💕',
+    pet: 'น้องแมวเคลิ้มแล้ว งื้ออ 🥹💗',
   }
+
+  try {
+    await performCatAction(roomId, action)
+
+    const result = await recordDailyCatAction(roomId, action)
+
+    const updatedCat = await getCatState(roomId)
+    setCat(updatedCat as CatState)
+
+    const daily = await getDailyMissions(roomId)
+    setMissions(daily.missions)
+    setBonusClaimed(daily.bonusClaimed)
+
+    if (result?.bonus_claimed) {
+      setMessage('สุดยอดเลย! ทำครบทุกภารกิจ รับโบนัส 10 หัวใจแล้ว 🎁💗')
+    } else if (result?.reward > 0) {
+      setMessage(
+        `${messages[action]} ทำภารกิจสำเร็จ รับ ${result.reward} หัวใจเพิ่ม! 💗`,
+      )
+    } else {
+      setMessage(messages[action])
+    }
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'ทำรายการไม่สำเร็จ')
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   const leaveRoom = () => {
     localStorage.removeItem('catRoomId')
@@ -261,24 +341,48 @@ function App() {
         )}
       </section>
 
-      <section className="mission">
-        <span className="eyebrow">DAILY ACTIVITIES</span>
-        <h2>ภารกิจของวันนี้ ✨</h2>
-        <p>ทำกิจกรรมกับน้องแมวเพื่อสะสมหัวใจกันเถอะ</p>
+      
+<section className="mission">
+  <span className="eyebrow">DAILY ACTIVITIES</span>
+  <h2>ภารกิจของวันนี้ ✨</h2>
+  <p>ทำกิจกรรมกับน้องแมวเพื่อสะสมหัวใจกันเถอะ</p>
 
-        <div className="mission-item">
-          <span>🍓 ให้อาหารน้องแมว</span>
-          <span>+2 💗</span>
+  {(['feed', 'play', 'pet'] as MissionType[]).map((type) => {
+    const info = missionInfo[type]
+    const mission = missions.find((item) => item.mission_type === type)
+    const progress = Math.min(mission?.progress ?? 0, info.target)
+    const completed = mission?.claimed ?? false
+
+    return (
+      <div className="mission-item" key={type}>
+        <div>
+          <strong>
+            {info.emoji} {info.title}
+          </strong>
+          <div className="progress">
+            <div
+              style={{
+                width: `${(progress / info.target) * 100}%`,
+              }}
+            />
+          </div>
+          <small>
+            {completed
+              ? 'สำเร็จแล้ว ✓'
+              : `${progress}/${info.target} ครั้ง`}
+          </small>
         </div>
-        <div className="mission-item">
-          <span>🧶 เล่นกับน้องแมว</span>
-          <span>+3 💗</span>
-        </div>
-        <div className="mission-item">
-          <span>🐾 ลูบหัวน้องแมว</span>
-          <span>+1 💗</span>
-        </div>
-      </section>
+        <span>{completed ? 'รับแล้ว 💗' : '+5 💗'}</span>
+      </div>
+    )
+  })}
+
+  <div className="mission-item">
+    <strong>🎁 โบนัสทำครบทุกภารกิจ</strong>
+    <span>{bonusClaimed ? 'รับแล้ว ✓' : '+10 💗'}</span>
+  </div>
+</section>
+
 
       <footer>Made with love ♡ for our little family</footer>
     </main>
