@@ -241,4 +241,79 @@ footer {
   width: 240px;
   height: 240px;
   object-fit: contain;
+} 
+.cat-image {
+  position: relative;
+}
+
+.cat-image.petting img {
+  animation: cat-petting 0.5s ease-in-out 2;
+  transform-origin: center bottom;
+}
+
+.pet-hearts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.pet-hearts span {
+  position: absolute;
+  bottom: 20%;
+  left: 50%;
+  font-size: 24px;
+  animation: heart-float 1s ease-out forwards;
+}
+
+.pet-hearts span:nth-child(1) {
+  --side: -45px;
+}
+
+.pet-hearts span:nth-child(2) {
+  --side: 35px;
+  animation-delay: 0.1s;
+}
+
+.pet-hearts span:nth-child(3) {
+  --side: -15px;
+  animation-delay: 0.2s;
+}
+
+.pet-hearts span:nth-child(4) {
+  --side: 55px;
+  animation-delay: 0.15s;
+}
+
+@keyframes cat-petting {
+  0%, 100% {
+    transform: translateY(0) rotate(0);
+  }
+  35% {
+    transform: translateY(-7px) rotate(-3deg);
+  }
+  70% {
+    transform: translateY(-2px) rotate(3deg);
+  }
+}
+
+@keyframes heart-float {
+  from {
+    transform: translate(-50%, 0) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc(-50% + var(--side, 0px)), -75px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-image.petting img,
+  .pet-hearts span {
+    animation-duration: 0.01ms;
+  }
 }

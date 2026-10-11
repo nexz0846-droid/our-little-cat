@@ -54,7 +54,7 @@ function App() {
 
 const [missions, setMissions] = useState<Mission[]>([])
 const [bonusClaimed, setBonusClaimed] = useState(false)
-
+const [petAnimation, setPetAnimation] = useState(false)
   useEffect(() => {
     if (!roomId) return
 
@@ -171,7 +171,10 @@ const handleAction = async (action: 'feed' | 'play' | 'pet') => {
 
   setLoading(true)
   setError('')
-
+if (action === 'pet') {
+  setPetAnimation(true)
+  window.setTimeout(() => setPetAnimation(false), 1000)
+}
   const messages = {
     feed: 'งั่ม ๆ อร่อยจัง ขอบคุณนะ! 😻',
     play: 'เหมียววว~ น้องแมวมีความสุขมากเลย 💕',
@@ -288,9 +291,20 @@ const handleAction = async (action: 'feed' | 'play' | 'pet') => {
 
             <div className="cat-card">
               <div className="sparkle">✦　♡　✦</div>
-              <div className="cat-image">
-                <img src="/cats/poop.gif" alt="น้องปลาน้อย" />
-              </div>
+              
+<div className={`cat-image ${petAnimation ? 'petting' : ''}`}>
+  <img src="/cats/poop.gif" alt="น้องปลาน้อย" />
+
+  {petAnimation && (
+    <div className="pet-hearts" aria-hidden="true">
+      <span>💗</span>
+      <span>💕</span>
+      <span>✨</span>
+      <span>💖</span>
+    </div>
+  )}
+</div>
+
 
               <h2>ปลาน้อย (narak)</h2>
               <p className="cat-message">{message}</p>
