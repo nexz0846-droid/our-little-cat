@@ -3,7 +3,7 @@ import Cat3D from './Cat3D'
 
 import { useEffect, useState } from 'react'
 import './App.css'
-import InventoryTabs from './inventoryTabs'
+import InventoryTabs from './InventoryTabs'
 import {
   getOrCreateSharedCatRoom,
   getCatState,
