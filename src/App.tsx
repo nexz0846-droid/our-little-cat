@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import './App.css'
-
+import InventoryTabs from './InventoryTabs'
 import {
   getOrCreateSharedCatRoom,
   getCatState,
@@ -567,7 +567,7 @@ function App() {
                 </>
               )}
             </div>
-
+<InventoryTabs roomId={roomId} />
             <section className="shop-section">
               <span className="eyebrow">OUR LITTLE SHOP</span>
               <h2>🛍️ ร้านค้าบ้านแมว</h2>

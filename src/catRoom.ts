@@ -98,7 +98,6 @@ export async function performCatAction(
   return data
 }
 
-// Realtime: เพิ่ม .on() ให้ครบก่อนเรียก .subscribe()
 export function subscribeToCat(
   roomId: string,
   onChange: () => void,
@@ -285,12 +284,37 @@ export async function purchaseCatShopItem(
 ) {
   await ensureSignedIn()
 
+  if (!roomId) {
+    throw new Error('ไม่พบรหัสห้องแมว')
+  }
+
+  const validItem = CAT_SHOP_ITEMS.some(
+    (item) => item.id === itemId,
+  )
+
+  if (!validItem) {
+    throw new Error(`ไม่พบสินค้า: ${itemId}`)
+  }
+
   const { data, error } = await supabase.rpc('purchase_cat_item', {
     p_room_id: roomId,
     p_item_id: itemId,
   })
 
-  if (error) throw error
+  if (error) {
+    console.error('ซื้อสินค้าไม่สำเร็จ:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+
+    throw new Error(
+      `ซื้อสินค้าไม่สำเร็จ (${error.code}): ${error.message}`,
+    )
+  }
+
+  console.log('ซื้อสินค้าสำเร็จ:', data)
 
   return data as {
     success: boolean
@@ -304,11 +328,29 @@ export async function purchaseCatShopItem(
 export async function getCatShopInventory(roomId: string) {
   await ensureSignedIn()
 
+  if (!roomId) {
+    throw new Error('ไม่พบรหัสห้องแมว')
+  }
+
   const { data, error } = await supabase.rpc(
     'get_cat_shop_inventory',
     { p_room_id: roomId },
   )
 
-  if (error) throw error
+  if (error) {
+    console.error('โหลดคลังสินค้าไม่สำเร็จ:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+
+    throw new Error(
+      `โหลดคลังสินค้าไม่สำเร็จ (${error.code}): ${error.message}`,
+    )
+  }
+
+  console.log('คลังสินค้าปัจจุบัน:', data)
+
   return (data ?? []) as ShopInventoryItem[]
 }
