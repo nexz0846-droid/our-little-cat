@@ -1,9 +1,15 @@
 
 import { supabase } from './supabase'
 
+// รหัสกลางสำหรับห้องแมวของเรา
+// ทุกอุปกรณ์ต้องใช้รหัสเดียวกัน
+const SHARED_ROOM_CODE = 'ourlittlecatsharedroom20261012'
+
 async function ensureSignedIn() {
-  const { data: { session }, error: sessionError } =
-    await supabase.auth.getSession()
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession()
 
   if (sessionError) throw sessionError
   if (session) return session.user
@@ -16,11 +22,11 @@ async function ensureSignedIn() {
   return data.user
 }
 
-export async function createCatRoom() {
+export async function createCatRoom(code?: string) {
   await ensureSignedIn()
 
-  // รหัสเชิญสุ่มยาว ไม่ใช้รหัสที่เดาง่าย
-  const inviteCode = crypto.randomUUID().replaceAll('-', '')
+  const inviteCode =
+    code ?? crypto.randomUUID().replaceAll('-', '')
 
   const { data, error } = await supabase.rpc('create_cat_room', {
     p_code: inviteCode,
@@ -46,18 +52,43 @@ export async function joinCatRoom(inviteCode: string) {
   return data as string
 }
 
-export async function getCatState(roomId: string) {
-  const { data, error } = await supabase
-    .from('shared_cat')
-    .select('*')
-    .eq('room_id', roomId)
-    .single()
+// เข้าห้องกลางเดิม หรือสร้างห้องกลางครั้งแรก
+export async function getOrCreateSharedCatRoom() {
+  try {
+    const roomId = await joinCatRoom(SHARED_ROOM_CODE)
 
-  if (error) throw error
+    return {
+      roomId,
+      inviteCode: SHARED_ROOM_CODE,
+    }
+  } catch {
+    try {
+      return await createCatRoom(SHARED_ROOM_CODE)
+    } catch (createError) {
+      // กรณีอีกอุปกรณ์สร้างห้องพร้อมกัน ให้ลองเข้าห้องอีกครั้ง
+      try {
+        const roomId = await joinCatRoom(SHARED_ROOM_CODE)
 
-  return data
+        return {
+          roomId,
+          inviteCode: SHARED_ROOM_CODE,
+        }
+      } catch {
+        throw createError
+      }
+    }
+  }
 }
 
+export async function getCatState(roomId: string) {
+  const { data, error } = await supabase.rpc(
+    'get_cat_state_with_decay',
+    { p_room_id: roomId },
+  )
+
+  if (error) throw error
+  return data
+}
 
 export async function performCatAction(
   roomId: string,
@@ -71,7 +102,6 @@ export async function performCatAction(
   if (error) throw error
   return data
 }
-
 
 export function subscribeToCat(
   roomId: string,
@@ -92,7 +122,9 @@ export function subscribeToCat(
     .subscribe()
 }
 
-export async function leaveRealtime(channel: ReturnType<typeof subscribeToCat>) {
+export async function leaveRealtime(
+  channel: ReturnType<typeof subscribeToCat>,
+) {
   await supabase.removeChannel(channel)
 }
 
@@ -120,10 +152,13 @@ export async function recordDailyCatAction(
   roomId: string,
   action: 'feed' | 'play' | 'pet',
 ) {
-  const { data, error } = await supabase.rpc('record_daily_cat_action', {
-    p_room_id: roomId,
-    p_action: action,
-  })
+  const { data, error } = await supabase.rpc(
+    'record_daily_cat_action',
+    {
+      p_room_id: roomId,
+      p_action: action,
+    },
+  )
 
   if (error) throw error
   return data
@@ -132,8 +167,10 @@ export async function recordDailyCatAction(
 export async function getDailyMissions(roomId: string) {
   const today = getThailandDate()
 
-  const [{ data: missions, error: missionError },
-    { data: bonus, error: bonusError }] = await Promise.all([
+  const [
+    { data: missions, error: missionError },
+    { data: bonus, error: bonusError },
+  ] = await Promise.all([
     supabase
       .from('daily_cat_missions')
       .select('mission_type, progress, claimed')
@@ -184,4 +221,13 @@ export function subscribeToMissions(
       onChange,
     )
     .subscribe()
+}
+
+export async function recoverCat(roomId: string) {
+  const { data, error } = await supabase.rpc('recover_cat', {
+    p_room_id: roomId,
+  })
+
+  if (error) throw error
+  return data
 }
