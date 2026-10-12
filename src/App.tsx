@@ -1,7 +1,9 @@
 
+import Cat3D from './Cat3D'
+
 import { useEffect, useState } from 'react'
 import './App.css'
-import InventoryTabs from './InventoryTabs'
+import InventoryTabs from './inventoryTabs'
 import {
   getOrCreateSharedCatRoom,
   getCatState,
@@ -115,6 +117,9 @@ function App() {
   const [missions, setMissions] = useState<Mission[]>([])
   const [bonusClaimed, setBonusClaimed] = useState(false)
   const [petAnimation, setPetAnimation] = useState(false)
+  const [catAnimation, setCatAnimation] = useState<
+  'idle' | 'feed' | 'play' | 'sleep' | 'pet'
+>('idle')
 
   const [shopInventory, setShopInventory] = useState<ShopInventoryItem[]>([])
   const [shopLoading, setShopLoading] = useState(false)
@@ -278,16 +283,25 @@ function App() {
     }
   }
 
+ 
   const handleAction = async (action: MissionType) => {
     if (!roomId || !cat || loading || cat.is_unconscious) return
 
     setLoading(true)
     setError('')
+    setCatAnimation(action)
+
+    window.setTimeout(() => {
+      setCatAnimation('idle')
+    }, 1800)
 
     if (action === 'pet') {
       setPetAnimation(true)
       window.setTimeout(() => setPetAnimation(false), 1000)
     }
+
+    // เก็บโค้ดส่วน messages, try, catch และ finally เดิมไว้ทั้งหมด
+
 
     const messages: Record<MissionType, string> = {
       feed: 'งั่ม ๆ อร่อยจัง ขอบคุณนะ! 😻',
@@ -474,7 +488,7 @@ function App() {
               <div className="sparkle">✦　♡　✦</div>
 
               <div className={`cat-image ${petAnimation ? 'petting' : ''}`}>
-                <img src="/cats/poop.gif" alt="น้องปลาน้อย" />
+                <Cat3D action={catAnimation} />
 
                 {petAnimation && (
                   <div className="pet-hearts" aria-hidden="true">
@@ -544,26 +558,42 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="actions">
-                    <button
-                      onClick={() => void handleAction('feed')}
-                      disabled={loading || cat.is_unconscious}
-                    >
-                      🍓 ให้อาหาร
-                    </button>
-                    <button
-                      onClick={() => void handleAction('play')}
-                      disabled={loading || cat.is_unconscious}
-                    >
-                      🧶 เล่นกับแมว
-                    </button>
-                    <button
-                      onClick={() => void handleAction('pet')}
-                      disabled={loading || cat.is_unconscious}
-                    >
-                      💗 ลูบหัว
-                    </button>
-                  </div>
+                 
+<div className="actions">
+  <button
+    onClick={() => void handleAction('feed')}
+    disabled={loading || cat.is_unconscious}
+  >
+    🍓 ให้อาหาร
+  </button>
+
+  <button
+    onClick={() => void handleAction('play')}
+    disabled={loading || cat.is_unconscious}
+  >
+    🧶 เล่นกับแมว
+  </button>
+
+  <button
+    onClick={() => void handleAction('pet')}
+    disabled={loading || cat.is_unconscious}
+  >
+    💗 ลูบหัว
+  </button>
+
+  <button
+    onClick={() => {
+      setCatAnimation('sleep')
+      window.setTimeout(() => {
+        setCatAnimation('idle')
+      }, 3000)
+    }}
+    disabled={loading || cat.is_unconscious}
+  >
+    💤 พักผ่อน
+  </button>
+</div>
+
                 </>
               )}
             </div>
