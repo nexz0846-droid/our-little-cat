@@ -33,6 +33,14 @@ type Mission = {
   claimed: boolean
 }
 
+type HomeLevel = {
+  level: number
+  name: string
+  emoji: string
+  start: number
+  next: number | null
+}
+
 const missionInfo: Record<
   MissionType,
   { title: string; emoji: string; target: number }
@@ -40,6 +48,56 @@ const missionInfo: Record<
   feed: { title: 'ให้อาหารน้องแมว', emoji: '🍓', target: 1 },
   play: { title: 'เล่นกับน้องแมว', emoji: '🧶', target: 2 },
   pet: { title: 'ลูบหัวน้องแมว', emoji: '🐾', target: 3 },
+}
+
+function getHomeLevel(hearts: number): HomeLevel {
+  if (hearts >= 1000) {
+    return {
+      level: 5,
+      name: 'ปราสาทแมวคู่รัก',
+      emoji: '🏰',
+      start: 1000,
+      next: null,
+    }
+  }
+
+  if (hearts >= 500) {
+    return {
+      level: 4,
+      name: 'บ้านแห่งความรัก',
+      emoji: '💖',
+      start: 500,
+      next: 1000,
+    }
+  }
+
+  if (hearts >= 250) {
+    return {
+      level: 3,
+      name: 'บ้านสวนแมว',
+      emoji: '🌷',
+      start: 250,
+      next: 500,
+    }
+  }
+
+  if (hearts >= 100) {
+    return {
+      level: 2,
+      name: 'บ้านแสนอบอุ่น',
+      emoji: '🏠',
+      start: 100,
+      next: 250,
+    }
+  }
+
+  return {
+    level: 1,
+    name: 'บ้านหลังน้อย',
+    emoji: '🏡',
+    start: 0,
+    next: 100,
+  }
 }
 
 function App() {
@@ -54,7 +112,22 @@ function App() {
   const [bonusClaimed, setBonusClaimed] = useState(false)
   const [petAnimation, setPetAnimation] = useState(false)
 
-  // เชื่อมต่อห้องแมวกลางโดยอัตโนมัติ
+  const heartTotal = Math.max(0, cat?.hearts ?? 0)
+  const homeLevel = getHomeLevel(heartTotal)
+
+  const homeProgress =
+    homeLevel.next === null
+      ? 100
+      : Math.min(
+          100,
+          Math.max(
+            0,
+            ((heartTotal - homeLevel.start) /
+              (homeLevel.next - homeLevel.start)) *
+              100,
+          ),
+        )
+
   const connectSharedRoom = async () => {
     setLoading(true)
     setError('')
@@ -81,7 +154,6 @@ function App() {
 
   useEffect(() => {
     void connectSharedRoom()
-    // เชื่อมต่อห้องเพียงครั้งเดียวเมื่อเปิดหน้าเว็บ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -180,7 +252,7 @@ function App() {
   }
 
   const handleAction = async (
-    action: 'feed' | 'play' | 'pet',
+    action: MissionType,
   ) => {
     if (!roomId || !cat || loading || cat.is_unconscious) return
 
@@ -192,7 +264,7 @@ function App() {
       window.setTimeout(() => setPetAnimation(false), 1000)
     }
 
-    const messages = {
+    const messages: Record<MissionType, string> = {
       feed: 'งั่ม ๆ อร่อยจัง ขอบคุณนะ! 😻',
       play: 'เหมียววว~ น้องแมวมีความสุขมากเลย 💕',
       pet: 'น้องแมวเคลิ้มแล้ว งื้ออ 🥹💗',
@@ -247,7 +319,7 @@ function App() {
       <header className="topbar">
         <div className="brand">🐱 Our Little Cat</div>
         <div className="heart-count">
-          💗 {cat?.hearts ?? 0} Hearts
+          💗 {heartTotal.toLocaleString()} Hearts
         </div>
       </header>
 
@@ -269,7 +341,6 @@ function App() {
                 ? 'กำลังเชื่อมต่อห้องแมว รอสักครู่นะ 💗'
                 : 'ยังเชื่อมต่อไม่ได้ ลองใหม่อีกครั้งได้เลย'}
             </p>
-
             <div className="actions">
               <button
                 onClick={() => void connectSharedRoom()}
@@ -289,8 +360,49 @@ function App() {
                 ห้องนี้ใช้ร่วมกัน ให้อาหาร เล่น และสะสมหัวใจไปด้วยกันนะ
                 💕
               </p>
-              <p>เปิดเว็บจากอุปกรณ์ของอีกคนเพื่อดูแลแมวตัวเดียวกันได้เลย</p>
+              <p>
+                เปิดเว็บจากอุปกรณ์ของอีกคนเพื่อดูแลแมวตัวเดียวกันได้เลย
+              </p>
             </div>
+
+            {cat && (
+              <div className="mission home-level-card">
+                <span className="eyebrow">OUR LOVE LEVEL</span>
+                <h2>
+                  {homeLevel.emoji} เลเวลบ้านแมว {homeLevel.level}
+                </h2>
+                <p>
+                  บ้านของเรา: <strong>{homeLevel.name}</strong>
+                </p>
+
+                <div className="mission-item">
+                  <strong>💗 หัวใจสะสมของเราสองคน</strong>
+                  <span>{heartTotal.toLocaleString()} ❤️</span>
+                </div>
+
+                <div
+                  className="progress happiness"
+                  style={{ marginTop: 16, height: 14 }}
+                  role="progressbar"
+                  aria-valuenow={Math.floor(homeProgress)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="ความคืบหน้าสู่เลเวลบ้านแมวถัดไป"
+                >
+                  <div style={{ width: `${homeProgress}%` }} />
+                </div>
+
+                <p>
+                  {homeLevel.next === null
+                    ? '🎉 บ้านของเราเลเวลสูงสุดแล้ว!'
+                    : `อีก ${homeLevel.next - heartTotal} หัวใจ จะเลื่อนเป็นเลเวล ${homeLevel.level + 1} 💕`}
+                </p>
+
+                <small>
+                  ความคืบหน้า {Math.floor(homeProgress)}%
+                </small>
+              </div>
+            )}
 
             <div className="cat-card">
               <div className="sparkle">✦　♡　✦</div>
@@ -319,12 +431,13 @@ function App() {
                   {cat.unconscious_until && (
                     <p>
                       ฟื้นฟูได้หลังเวลา{' '}
-                      {new Date(
-                        cat.unconscious_until,
-                      ).toLocaleTimeString('th-TH', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {new Date(cat.unconscious_until).toLocaleTimeString(
+                        'th-TH',
+                        {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        },
+                      )}
                     </p>
                   )}
 
@@ -372,14 +485,12 @@ function App() {
                     >
                       🍓 ให้อาหาร
                     </button>
-
                     <button
                       onClick={() => void handleAction('play')}
                       disabled={loading || cat.is_unconscious}
                     >
                       🧶 เล่นกับแมว
                     </button>
-
                     <button
                       onClick={() => void handleAction('pet')}
                       disabled={loading || cat.is_unconscious}
@@ -396,7 +507,9 @@ function App() {
         {error && (
           <div className="mission" role="alert">
             <p>⚠️ {error}</p>
-            <p>ถ้าเชื่อมต่อไม่ได้ ให้ตรวจสอบการตั้งค่า Supabase ด้วยนะครับ</p>
+            <p>
+              ถ้าเชื่อมต่อไม่ได้ ให้ตรวจสอบการตั้งค่า Supabase ด้วยนะครับ
+            </p>
           </div>
         )}
       </section>
