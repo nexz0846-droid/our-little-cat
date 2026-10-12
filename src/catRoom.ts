@@ -1,8 +1,6 @@
 
 import { supabase } from './supabase'
 
-// รหัสกลางสำหรับห้องแมวของเรา
-// ทุกอุปกรณ์ต้องใช้รหัสเดียวกัน
 const SHARED_ROOM_CODE = 'ourlittlecatsharedroom20261012'
 
 async function ensureSignedIn() {
@@ -25,8 +23,7 @@ async function ensureSignedIn() {
 export async function createCatRoom(code?: string) {
   await ensureSignedIn()
 
-  const inviteCode =
-    code ?? crypto.randomUUID().replaceAll('-', '')
+  const inviteCode = code ?? crypto.randomUUID().replaceAll('-', '')
 
   const { data, error } = await supabase.rpc('create_cat_room', {
     p_code: inviteCode,
@@ -52,7 +49,6 @@ export async function joinCatRoom(inviteCode: string) {
   return data as string
 }
 
-// เข้าห้องกลางเดิม หรือสร้างห้องกลางครั้งแรก
 export async function getOrCreateSharedCatRoom() {
   try {
     const roomId = await joinCatRoom(SHARED_ROOM_CODE)
@@ -65,7 +61,6 @@ export async function getOrCreateSharedCatRoom() {
     try {
       return await createCatRoom(SHARED_ROOM_CODE)
     } catch (createError) {
-      // กรณีอีกอุปกรณ์สร้างห้องพร้อมกัน ให้ลองเข้าห้องอีกครั้ง
       try {
         const roomId = await joinCatRoom(SHARED_ROOM_CODE)
 
@@ -103,23 +98,25 @@ export async function performCatAction(
   return data
 }
 
+// Realtime: เพิ่ม .on() ให้ครบก่อนเรียก .subscribe()
 export function subscribeToCat(
   roomId: string,
   onChange: () => void,
 ) {
-  return supabase
-    .channel(`cat-room-${roomId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'shared_cat',
-        filter: `room_id=eq.${roomId}`,
-      },
-      onChange,
-    )
-    .subscribe()
+  const channel = supabase.channel(`cat-room-${roomId}`)
+
+  channel.on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'shared_cat',
+      filter: `room_id=eq.${roomId}`,
+    },
+    onChange,
+  )
+
+  return channel.subscribe()
 }
 
 export async function leaveRealtime(
@@ -198,8 +195,9 @@ export function subscribeToMissions(
   roomId: string,
   onChange: () => void,
 ) {
-  return supabase
-    .channel(`daily-missions-${roomId}`)
+  const channel = supabase.channel(`daily-missions-${roomId}`)
+
+  channel
     .on(
       'postgres_changes',
       {
@@ -220,7 +218,8 @@ export function subscribeToMissions(
       },
       onChange,
     )
-    .subscribe()
+
+  return channel.subscribe()
 }
 
 export async function recoverCat(roomId: string) {
@@ -230,4 +229,86 @@ export async function recoverCat(roomId: string) {
 
   if (error) throw error
   return data
+}
+
+// ================================
+// ร้านค้าแลกหัวใจ
+// ================================
+
+export type ShopItem = {
+  id: string
+  name: string
+  emoji: string
+  price: number
+  description: string
+}
+
+export type ShopInventoryItem = {
+  item_id: string
+  quantity: number
+}
+
+export const CAT_SHOP_ITEMS: ShopItem[] = [
+  {
+    id: 'cat_bed',
+    name: 'เตียงแมวแสนนุ่ม',
+    emoji: '🛏️',
+    price: 30,
+    description: 'ที่นอนนุ่ม ๆ สำหรับเจ้าเหมียว',
+  },
+  {
+    id: 'couple_sofa',
+    name: 'โซฟาคู่รัก',
+    emoji: '🛋️',
+    price: 50,
+    description: 'โซฟาสำหรับบ้านของเราสองคน',
+  },
+  {
+    id: 'flower_pot',
+    name: 'กระถางดอกไม้',
+    emoji: '🌷',
+    price: 20,
+    description: 'เพิ่มความสดใสให้บ้านแมว',
+  },
+  {
+    id: 'scratch_post',
+    name: 'ที่ฝนเล็บแมว',
+    emoji: '🧶',
+    price: 40,
+    description: 'ของเล่นสำหรับน้องแมวขี้เล่น',
+  },
+]
+
+export async function purchaseCatShopItem(
+  roomId: string,
+  itemId: string,
+) {
+  await ensureSignedIn()
+
+  const { data, error } = await supabase.rpc('purchase_cat_item', {
+    p_room_id: roomId,
+    p_item_id: itemId,
+  })
+
+  if (error) throw error
+
+  return data as {
+    success: boolean
+    item_id: string
+    item_name: string
+    cost: number
+    remaining_hearts: number
+  }
+}
+
+export async function getCatShopInventory(roomId: string) {
+  await ensureSignedIn()
+
+  const { data, error } = await supabase.rpc(
+    'get_cat_shop_inventory',
+    { p_room_id: roomId },
+  )
+
+  if (error) throw error
+  return (data ?? []) as ShopInventoryItem[]
 }

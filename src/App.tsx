@@ -12,6 +12,10 @@ import {
   recordDailyCatAction,
   subscribeToMissions,
   recoverCat,
+  CAT_SHOP_ITEMS,
+  getCatShopInventory,
+  purchaseCatShopItem,
+  type ShopInventoryItem,
 } from './catRoom'
 
 type CatState = {
@@ -112,6 +116,10 @@ function App() {
   const [bonusClaimed, setBonusClaimed] = useState(false)
   const [petAnimation, setPetAnimation] = useState(false)
 
+  const [shopInventory, setShopInventory] = useState<ShopInventoryItem[]>([])
+  const [shopLoading, setShopLoading] = useState(false)
+  const [shopMessage, setShopMessage] = useState('')
+
   const heartTotal = Math.max(0, cat?.hearts ?? 0)
   const homeLevel = getHomeLevel(heartTotal)
 
@@ -157,6 +165,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // โหลดแมวและคลังสินค้า พร้อมใช้ Realtime channel เดียวกัน
   useEffect(() => {
     if (!roomId) return
 
@@ -177,10 +186,27 @@ function App() {
       }
     }
 
+    const refreshInventory = async () => {
+      try {
+        const inventory = await getCatShopInventory(roomId)
+        if (active) setShopInventory(inventory)
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'โหลดคลังของไม่สำเร็จ',
+          )
+        }
+      }
+    }
+
     void refreshCat()
+    void refreshInventory()
 
     const channel = subscribeToCat(roomId, () => {
       void refreshCat()
+      void refreshInventory()
     })
 
     return () => {
@@ -189,6 +215,7 @@ function App() {
     }
   }, [roomId])
 
+  // ภารกิจประจำวันมี channel ของตัวเอง
   useEffect(() => {
     if (!roomId) {
       setMissions([])
@@ -251,9 +278,7 @@ function App() {
     }
   }
 
-  const handleAction = async (
-    action: MissionType,
-  ) => {
+  const handleAction = async (action: MissionType) => {
     if (!roomId || !cat || loading || cat.is_unconscious) return
 
     setLoading(true)
@@ -311,6 +336,50 @@ function App() {
       )
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleBuyShopItem = async (itemId: string) => {
+    if (!roomId || !cat || shopLoading || loading) return
+
+    const item = CAT_SHOP_ITEMS.find((product) => product.id === itemId)
+    if (!item) return
+
+    if (cat.is_unconscious) {
+      setShopMessage('รอน้องแมวฟื้นก่อน แล้วค่อยเลือกซื้อของนะ 💗')
+      return
+    }
+
+    if (cat.hearts < item.price) {
+      setShopMessage('หัวใจยังไม่พอ ทำภารกิจเพื่อสะสมเพิ่มนะ 💗')
+      return
+    }
+
+    setShopLoading(true)
+    setShopMessage('')
+    setError('')
+
+    try {
+      const result = await purchaseCatShopItem(roomId, itemId)
+
+      const [updatedCat, inventory] = await Promise.all([
+        getCatState(roomId),
+        getCatShopInventory(roomId),
+      ])
+
+      setCat(updatedCat as CatState)
+      setShopInventory(inventory)
+      setShopMessage(
+        `ซื้อ${result.item_name}สำเร็จ! หัก ${result.cost} หัวใจแล้ว 💗`,
+      )
+    } catch (err) {
+      setShopMessage(
+        err instanceof Error
+          ? err.message
+          : 'ซื้อของไม่สำเร็จ กรุณาลองใหม่',
+      )
+    } finally {
+      setShopLoading(false)
     }
   }
 
@@ -376,7 +445,7 @@ function App() {
                 </p>
 
                 <div className="mission-item">
-                  <strong>💗 หัวใจสะสมของเราสองคน</strong>
+                  <strong>💗 หัวใจของเราสองคน</strong>
                   <span>{heartTotal.toLocaleString()} ❤️</span>
                 </div>
 
@@ -397,10 +466,7 @@ function App() {
                     ? '🎉 บ้านของเราเลเวลสูงสุดแล้ว!'
                     : `อีก ${homeLevel.next - heartTotal} หัวใจ จะเลื่อนเป็นเลเวล ${homeLevel.level + 1} 💕`}
                 </p>
-
-                <small>
-                  ความคืบหน้า {Math.floor(homeProgress)}%
-                </small>
+                <small>ความคืบหน้า {Math.floor(homeProgress)}%</small>
               </div>
             )}
 
@@ -501,6 +567,98 @@ function App() {
                 </>
               )}
             </div>
+
+            <section className="shop-section">
+              <span className="eyebrow">OUR LITTLE SHOP</span>
+              <h2>🛍️ ร้านค้าบ้านแมว</h2>
+              <p>เลือกของตกแต่งน่ารัก ๆ ให้บ้านของเราสองคน</p>
+
+              <div className="shop-balance">
+                💗 หัวใจของเรา: {heartTotal.toLocaleString()}
+              </div>
+
+              {shopMessage && (
+                <p className="shop-message" role="status">
+                  {shopMessage}
+                </p>
+              )}
+
+              <div className="shop-grid">
+                {CAT_SHOP_ITEMS.map((item) => {
+                  const owned =
+                    shopInventory.find(
+                      (product) => product.item_id === item.id,
+                    )?.quantity ?? 0
+
+                  const canAfford = heartTotal >= item.price
+
+                  return (
+                    <article className="shop-item" key={item.id}>
+                      <div className="shop-item-emoji">{item.emoji}</div>
+                      <h3>{item.name}</h3>
+                      <p>{item.description}</p>
+                      <div className="shop-price">
+                        💗 {item.price} หัวใจ
+                      </div>
+                      <div className="shop-owned">
+                        ในคลัง: {owned} ชิ้น
+                      </div>
+                      <button
+                        className="shop-buy-button"
+                        onClick={() => void handleBuyShopItem(item.id)}
+                        disabled={
+                          shopLoading ||
+                          loading ||
+                          !cat ||
+                          cat.is_unconscious ||
+                          !canAfford
+                        }
+                      >
+                        {shopLoading
+                          ? 'กำลังซื้อ...'
+                          : !canAfford
+                            ? 'หัวใจไม่พอ 💗'
+                            : '🛍️ ซื้อเลย'}
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+
+              <div className="shop-inventory">
+                <h3>🎁 คลังของตกแต่งของเรา</h3>
+
+                {shopInventory.length === 0 ? (
+                  <p>ยังไม่มีของตกแต่ง มาเลือกซื้อชิ้นแรกกันนะ 💕</p>
+                ) : (
+                  <div className="inventory-list">
+                    {shopInventory.map((ownedItem) => {
+                      const item = CAT_SHOP_ITEMS.find(
+                        (product) => product.id === ownedItem.item_id,
+                      )
+
+                      if (!item) return null
+
+                      return (
+                        <div
+                          className="inventory-item"
+                          key={ownedItem.item_id}
+                        >
+                          <span>
+                            {item.emoji} {item.name}
+                          </span>
+                          <strong>× {ownedItem.quantity}</strong>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <p className="inventory-note">
+                  ของที่ซื้อจะถูกเก็บไว้ในคลังของห้องแมวร่วมกัน 🏡
+                </p>
+              </div>
+            </section>
           </>
         )}
 
