@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
-import './InventoryTabs.css'
+import './inventoryTabs.css'
 import {
   CAT_SHOP_ITEMS,
   getCatShopInventory,
