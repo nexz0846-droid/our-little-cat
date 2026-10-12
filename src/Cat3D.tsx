@@ -466,7 +466,7 @@ function CuteCat({ action }: { action: CatAction }) {
           onPointerDown={(event) => {
             event.stopPropagation()
             petPointer.current = event.pointerId
-            event.target.setPointerCapture(event.pointerId)
+            event.target.(event.pointerId)
             setIsPetting(true)
           }}
           onPointerMove={(event) => {
